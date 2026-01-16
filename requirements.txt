@@ -1,8 +1,9 @@
-face-recognition
-opencv-python-headless==4.8.1.78
-matplotlib
-streamlit
 numpy==1.26.4
+streamlit
+opencv-python-headless
+matplotlib
 scikit-learn
 google-genai
 Pillow
+dlib-bin
+face-recognition
