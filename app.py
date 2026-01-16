@@ -15,13 +15,16 @@ instruction_path = "instructions.txt"
 with open(instruction_path, "r", encoding="utf-8") as file:
     system_instructions = file.read()
 
-api_key = st.secrets["GEMINI_API_KEY"]
-client = genai.Client(api_key=api_key)
+api_key = os.environ.get("GEMINI_API_KEY", "")
+client = genai.Client(api_key=api_key) if api_key else None
 
 MODEL_NAME = "gemini-2.5-flash"
 
 
 def get_gemini_response(user_input, context):
+    if not client:
+        st.session_state.gemini_response = "AI features require GEMINI_API_KEY to be configured."
+        return
     st.write("Thinking...")
     try:
 
