@@ -1,0 +1,9 @@
+face-recognition
+opencv-python-headless
+matplotlib
+streamlit
+numpy
+scikit-learn
+google-genai
+python-dotenv
+Pillow
