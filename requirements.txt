@@ -1,9 +1,0 @@
-numpy==1.26.4
-streamlit
-opencv-python-headless
-matplotlib
-scikit-learn
-google-genai
-Pillow
-dlib-bin
-face-recognition
