@@ -9,16 +9,13 @@ from sklearn.linear_model import LinearRegression
 from PIL import Image
 import json
 from google.genai import types, errors
-from dotenv import load_dotenv
-
-load_dotenv()
 
 instruction_path = "instructions.txt"
 
 with open(instruction_path, "r", encoding="utf-8") as file:
     system_instructions = file.read()
 
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=api_key)
 
 MODEL_NAME = "gemini-2.5-flash"
@@ -664,56 +661,30 @@ elif st.session_state.step == "compare_stocks":
                 all_data[file] = json.load(f)
 
     if view_mode == "Histogram":
-        graph, stats = st.columns([3, 1])
 
-        with graph:
-            fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(12, 6))
 
-            max_days = max(len(data["prices"]) for data in all_data.values())
-            step = max(1, max_days // 10)
-            days_to_show = list(range(0, max_days, step))
+        max_days = max(len(data["prices"]) for data in all_data.values())
+        step = max(1, max_days // 10)
+        days_to_show = list(range(0, max_days, step))
 
-            if max_days not in days_to_show:
-                days_to_show.append(max_days)
+        if max_days not in days_to_show:
+            days_to_show.append(max_days)
 
-            x = np.arange(len(days_to_show))
-            width = 0.2
+        x = np.arange(len(days_to_show))
+        width = 0.2
 
-            for i, (file, data) in enumerate(all_data.items()):
-                prices = data["prices"]
-                selected_prices = [prices[min(d, len(prices) - 1)] for d in days_to_show]
-                ax.bar(x + i * width, selected_prices, width, label=stock_files[file]["histogram_name"])
+        for i, (file, data) in enumerate(all_data.items()):
+            prices = data["prices"]
+            selected_prices = [prices[min(d, len(prices) - 1)] for d in days_to_show]
+            ax.bar(x + i * width, selected_prices, width, label=stock_files[file]["histogram_name"])
 
-            ax.set_xlabel("Time Period")
-            ax.set_xticks(x + width * 1.5)
-            ax.set_xticklabels([f"Day {d}" for d in days_to_show])
-            ax.set_ylabel("Price ($)")
-            ax.legend()
-            st.pyplot(fig)
-
-        with stats:
-            st.subheader("Statistics")
-
-            stat_table = {
-                "Stock": [],
-                "Median": [],
-                "Q1": [],
-                "Q3": [],
-                "IQR": []
-            }
-
-            for file, data in all_data.items():
-                prices = np.array(data["prices"])
-                q1 = np.percentile(prices, 25)
-                q3 = np.percentile(prices, 75)
-
-                stat_table["Stock"].append(stock_files[file]['histogram_name'])
-                stat_table["Median"].append(f"${np.median(prices):.2f}")
-                stat_table["Q1"].append(f"${q1:.2f}")
-                stat_table["Q3"].append(f"${q3:.2f}")
-                stat_table["IQR"].append(f"${q3 - q1:.2f}")
-
-            st.table(stat_table)
+        ax.set_xlabel("Time Period")
+        ax.set_xticks(x + width * 1.5)
+        ax.set_xticklabels([f"Day {d}" for d in days_to_show])
+        ax.set_ylabel("Price ($)")
+        ax.legend()
+        st.pyplot(fig)
 
     elif view_mode == "Box Plot":
         graph, stats = st.columns([3.3,2])
