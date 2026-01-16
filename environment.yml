@@ -1,0 +1,16 @@
+name: streamlit-face-app
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - dlib
+  - face_recognition
+  - numpy=1.26.4
+  - streamlit
+  - matplotlib
+  - scikit-learn
+  - pillow
+  - pip
+  - pip:
+    - opencv-python-headless
+    - google-genai
