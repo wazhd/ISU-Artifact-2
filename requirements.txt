@@ -1,0 +1,7 @@
+numpy==1.26.4
+streamlit
+matplotlib
+scikit-learn
+google-genai
+Pillow
+face-recognition

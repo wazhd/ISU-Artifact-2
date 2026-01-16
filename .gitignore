@@ -9,7 +9,6 @@ env/
 bank_database.pkl
 user_assets.pkl
 assets.json
-requirements.txt
 
 __pycache__/
 *.pyc
