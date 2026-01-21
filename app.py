@@ -133,9 +133,8 @@ def update_assets(key, num):
 
 
 def get_user_asset(key):
-    if st.session_state.username in asset_data:
-        return asset_data[st.session_state.username].get(key, 0)
-    return 0
+
+    return asset_data[st.session_state.username].get(key)
 
 
 def reset_assets():
@@ -535,12 +534,7 @@ elif st.session_state.step == "stock_market":
                     update_assets(asset_number, shares_after)
                     update_assets(asset_value, shares_after * current_price)
 
-                    assets_json["total_money"] = [balance_after]
-                    assets_json[asset_number] = [shares_after]
-                    assets_json[asset_value] = [shares_after * current_price]
-
-                    with open("assets.json", "w") as f:
-                        json.dump(assets_json, f, indent=4)
+                    pkl_to_json()
 
                     st.success(f"Bought {buy_input} shares!")
 
@@ -570,12 +564,7 @@ elif st.session_state.step == "stock_market":
                     update_assets(asset_number, shares_after)
                     update_assets(asset_value, shares_after * current_price)
 
-                    assets_json["total_money"] = [balance_after]
-                    assets_json[asset_number] = [shares_after]
-                    assets_json[asset_value] = [shares_after * current_price]
-
-                    with open("assets.json", "w") as f:
-                        json.dump(assets_json, f, indent=4)
+                    pkl_to_json()
 
                     st.success(f"Sold {sell_input} shares!")
                     st.rerun()
