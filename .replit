@@ -4,7 +4,31 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["cairo", "cmake", "dlib", "ffmpeg-full", "freetype", "ghostscript", "glib", "glibcLocales", "gobject-introspection", "gtk3", "lcms2", "libGL", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "pkg-config", "qhull", "tcl", "tk", "zlib"]
+packages = [
+  "cairo",
+  "cmake",
+  "dlib",
+  "ffmpeg-full",
+  "freetype",
+  "ghostscript",
+  "glib",
+  "glibcLocales",
+  "gobject-introspection",
+  "gtk3",
+  "lcms2",
+  "libGL",
+  "libimagequant",
+  "libjpeg",
+  "libtiff",
+  "libwebp",
+  "libxcrypt",
+  "openjpeg",
+  "pkg-config",
+  "qhull",
+  "tcl",
+  "tk",
+  "zlib",
+]
 
 [workflows]
 runButton = "Project"
@@ -33,3 +57,7 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[deployment]
+deploymentTarget = "cloudrun"
+run = ["sh", "-c", "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"]
