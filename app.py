@@ -3,7 +3,6 @@ import random
 import pickle
 import face_recognition
 import matplotlib.pyplot as plt
-from numpy.random import randint
 import streamlit as st
 import numpy as np
 import google.genai as genai
@@ -20,7 +19,7 @@ with open(instruction_path, "r", encoding="utf-8") as file:
 api_key = os.environ.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key)
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-3-flash-preview"
 
 
 def get_gemini_response(user_input, context):
@@ -121,6 +120,7 @@ def init_assets(username):
 
         with open(ASSETS, "wb") as f:
             pickle.dump(asset_data, f)
+        pkl_to_json()
     else:
         pkl_to_json()
 
@@ -130,11 +130,13 @@ def update_assets(key, num):
         asset_data[st.session_state.username][key] = num
         with open(ASSETS, "wb") as f:
             pickle.dump(asset_data, f)
+        pkl_to_json()
 
 
 def get_user_asset(key):
-
-    return asset_data[st.session_state.username].get(key)
+    if st.session_state.username in asset_data:
+        return asset_data[st.session_state.username].get(key)
+    return None
 
 
 def reset_assets():
@@ -176,6 +178,9 @@ def reset_assets():
         "stock_4_values": stock_4_values
     }
 
+    with open(ASSETS, "wb") as f:
+        pickle.dump(asset_data, f)
+
     pkl_to_json()
 
     st.rerun()
@@ -199,6 +204,9 @@ def check_bankruptcy():
     s3 = get_user_asset("stock_3_value")
     s4 = get_user_asset("stock_4_value")
 
+    if money is None or s1 is None or s2 is None or s3 is None or s4 is None:
+        return
+
     net_worth = money + s1 + s2 + s3 + s4
 
     if net_worth <= 0:
@@ -221,6 +229,8 @@ if "gemini_response" not in st.session_state:
 
 with st.sidebar:
     if st.button("🏠 Home"):
+        st.session_state.username = ""
+        st.session_state.is_verified = False
         st.session_state.step = "menu"
         st.rerun()
     if st.session_state.is_verified:
@@ -335,6 +345,7 @@ elif st.session_state.step == "bank_account":
     if st.button("Compare Stocks"):
         st.session_state.step = "compare_stocks"
         st.rerun()
+
 elif st.session_state.step == "stock_market":
     st.subheader("Stock Market Simulation")
     check_bankruptcy()
@@ -346,45 +357,128 @@ elif st.session_state.step == "stock_market":
 
     display_name = st.selectbox("Select a stock to analyse", stock_options)
 
-    with open("assets.json", "r") as f:
-        assets_json = json.load(f)
-
     if display_name == stock_options[0]:
         index = 0
-        asset_value = "stock_1_value"
+        asset_value = "stock_1_values"
         asset_number = "total_stock_1"
+        asset_value_key = "stock_1_value"
         asset_days = "stock_1_days"
 
     elif display_name == stock_options[1]:
         index = 1
-        asset_value = "stock_2_value"
+        asset_value = "stock_2_values"
         asset_number = "total_stock_2"
+        asset_value_key = "stock_2_value"
         asset_days = "stock_2_days"
 
     elif display_name == stock_options[2]:
         index = 2
-        asset_value = "stock_3_value"
+        asset_value = "stock_3_values"
         asset_number = "total_stock_3"
+        asset_value_key = "stock_3_value"
         asset_days = "stock_3_days"
 
     elif display_name == stock_options[3]:
         index = 3
-        asset_value = "stock_4_value"
+        asset_value = "stock_4_values"
         asset_number = "total_stock_4"
+        asset_value_key = "stock_4_value"
         asset_days = "stock_4_days"
     else:
         index = 0
-        asset_value = "stock_1_value"
+        asset_value = "stock_1_values"
         asset_number = "total_stock_1"
+        asset_value_key = "stock_1_value"
         asset_days = "stock_1_days"
+
+    graph, panel = st.columns([3, 1])
+
+    with panel:
+        target_days = st.text_input("Simulate to day (extrapolation)",
+                                    placeholder="Enter day number",
+                                    key="sim_input")
+
+        if st.button("Run Simulation"):
+            if target_days:
+                try:
+                    target_days_int = int(target_days)
+
+                    for stock_num in range(1, 5):
+                        stock_days_key = f"stock_{stock_num}_days"
+                        stock_values_key = f"stock_{stock_num}_values"
+
+                        current_days = get_user_asset(stock_days_key)
+                        current_values = get_user_asset(stock_values_key)
+
+                        if current_days is None or current_values is None:
+                            continue
+
+                        current_days = list(current_days)
+                        current_values = list(current_values)
+                        current_max_day = max(current_days)
+
+                        if target_days_int > current_max_day:
+                            x = np.array(current_days).reshape(-1, 1)
+                            y = np.array(current_values)
+                            model = LinearRegression()
+                            model.fit(x, y)
+
+                            new_days = []
+                            new_prices = []
+
+                            for i in range(current_max_day + 1,
+                                           target_days_int + 1):
+                                prediction = model.predict([[i]])[0]
+
+                                n_min = random.uniform(-0.03, -0.01)
+                                n_max = random.uniform(0.02, 0.05)
+                                noise = prediction * np.random.uniform(
+                                    n_min, n_max)
+                                new_price = round(float(prediction + noise), 2)
+
+                                new_days.append(i)
+
+                                if new_price < 1:
+                                    new_prices.append(1)
+                                else:
+                                    new_prices.append(new_price)
+
+                            current_days.extend(new_days)
+                            current_values.extend(new_prices)
+
+                            update_assets(stock_days_key, current_days)
+                            update_assets(stock_values_key, current_values)
+
+                    check_bankruptcy()
+                    st.success(
+                        f"Simulated ALL stocks up to day {target_days_int}")
+                    st.rerun()
+
+                except ValueError:
+                    st.error("Please enter a valid number")
 
     days = get_user_asset(asset_days)
     value = get_user_asset(asset_value)
 
+    if days is None or value is None:
+        st.error(
+            "Error loading stock data. Please try logging in again or reset your assets."
+        )
+        if st.button("Reset Assets"):
+            reset_assets()
+        st.stop()
+
+    days = list(days)
+    value = list(value)
+
+    min_len = min(len(days), len(value))
+    days = days[:min_len]
+    value = value[:min_len]
+
     fig, ax = plt.subplots()
 
     ax.scatter(days, value)
-    ax.set_title(display_name[index])
+    ax.set_title(display_name)
 
     x_min, x_max = ax.get_xlim()
 
@@ -407,8 +501,6 @@ elif st.session_state.step == "stock_market":
 
     ax.set_xlabel("Days")
     ax.set_ylabel("Stock price ($)")
-
-    graph, panel = st.columns([3, 1])
 
     with graph:
         st.pyplot(fig)
@@ -449,96 +541,47 @@ elif st.session_state.step == "stock_market":
         reset_assets()
 
     with panel:
-        target_days = st.text_input("Simulate to day (extrapolation)",
-                                    placeholder="Enter day number",
-                                    key="sim_input")
-
-        if st.button("Run Simulation"):
-            if target_days:
-                try:
-                    target_days_int = int(target_days)
-
-                    with open("assets.json", "r") as f:
-                        stock_data = json.load(f)
-
-                    current_max_day = max(stock_data[asset_days])
-
-                    if target_days_int > current_max_day:
-                        x = np.array(stock_data[asset_days]).reshape(-1, 1)
-                        y = np.array(stock_data[asset_value])
-                        model = LinearRegression()
-                        model.fit(x, y)
-
-                        new_days = []
-                        new_prices = []
-
-                        for i in range(current_max_day + 1,
-                                       target_days_int + 1):
-                            prediction = model.predict([[i]])[0]
-
-                            min = random.uniform(-0.03, -0.01)
-                            max = random.uniform(0.02, 0.05)
-
-                            noise = prediction * np.random.uniform(min, max)
-                            new_price = round(float(prediction + noise), 2)
-
-                            new_days.append(i)
-
-                            if new_price < 1:
-                                new_prices.append(1)
-                            else:
-                                new_prices.append(new_price)
-
-                        stock_data[asset_days].extend(new_days)
-                        stock_data[asset_value].extend(new_prices)
-
-                        update_assets(asset_days, stock_data[asset_days])
-                        update_assets(asset_value, stock_data[asset_value])
-
-                        pkl_to_json()
-
-                    check_bankruptcy()
-                    st.success(
-                        f"Simulated ALL stocks up to day {target_days_int}")
-                    st.rerun()
-
-                except ValueError:
-                    st.error("Please enter a valid number")
-
         current_money = get_user_asset("total_money")
-        current_price = get_user_asset(asset_value)[-1]
+        current_value_list = get_user_asset(asset_value)
+
+        if current_money is None or current_value_list is None:
+            st.error("Error loading data")
+            st.stop()
+
+        current_price = current_value_list[-1]
 
         st.divider()
         buy_input = st.number_input("Buy shares", min_value=0, step=1)
 
         if buy_input > 0:
-            total_cost = np.abs(current_price * buy_input)
-            balance_after = current_money - total_cost
             stock_number = get_user_asset(asset_number)
-            shares_after = stock_number + buy_input
 
-            st.write(f"Current Shares: {stock_number:,.2f}")
-            st.write(f"Shares After: {shares_after:,.2f}")
-            st.write(f"Current Balance: ${current_money:,.2f}")
-            st.write(f"Cost: ${total_cost:,.2f}")
-            st.write(f"Balance After: ${balance_after:,.2f}")
-
-            if total_cost > current_money:
-                st.error("Insufficient funds!")
+            if stock_number is None:
+                st.error("Error loading stock data")
             else:
-                if st.button("Confirm Purchase"):
-                    new_balance = current_money - total_cost
-                    update_assets("total_money", new_balance)
+                total_cost = np.abs(current_price * buy_input)
+                balance_after = current_money - total_cost
+                shares_after = stock_number + buy_input
 
-                    update_assets("total_money", balance_after)
-                    update_assets(asset_number, shares_after)
-                    update_assets(asset_value, shares_after * current_price)
+                st.write(f"Current Shares: {stock_number:,.2f}")
+                st.write(f"Shares After: {shares_after:,.2f}")
+                st.write(f"Current Balance: ${current_money:,.2f}")
+                st.write(f"Cost: ${total_cost:,.2f}")
+                st.write(f"Balance After: ${balance_after:,.2f}")
 
-                    pkl_to_json()
+                if total_cost > current_money:
+                    st.error("Insufficient funds!")
+                else:
+                    if st.button("Confirm Purchase"):
 
-                    st.success(f"Bought {buy_input} shares!")
+                        update_assets("total_money", balance_after)
+                        update_assets(asset_number, shares_after)
+                        update_assets(asset_value_key,
+                                      shares_after * current_price)
 
-                    st.rerun()
+                        st.success(f"Bought {buy_input} shares!")
+
+                        st.rerun()
 
         st.divider()
         sell_input = st.number_input("Sell shares", min_value=0, step=1)
@@ -546,7 +589,9 @@ elif st.session_state.step == "stock_market":
         if sell_input > 0:
             stock_number = get_user_asset(asset_number)
 
-            if sell_input > stock_number:
+            if stock_number is None:
+                st.error("Error loading stock data")
+            elif sell_input > stock_number:
                 st.error("Not enough shares!")
             else:
                 gain = np.abs(sell_input * current_price)
@@ -562,9 +607,8 @@ elif st.session_state.step == "stock_market":
                 if st.button("Confirm Sale"):
                     update_assets("total_money", balance_after)
                     update_assets(asset_number, shares_after)
-                    update_assets(asset_value, shares_after * current_price)
-
-                    pkl_to_json()
+                    update_assets(asset_value_key,
+                                  shares_after * current_price)
 
                     st.success(f"Sold {sell_input} shares!")
                     st.rerun()
@@ -575,19 +619,21 @@ elif st.session_state.step == "assets":
     st.subheader(f"Portfolio for {st.session_state.username}")
 
     account_balance = get_user_asset("total_money")
-
     s1_qty = get_user_asset("total_stock_1")
     s1_val = get_user_asset("stock_1_value")
-
     s2_qty = get_user_asset("total_stock_2")
-
     s2_val = get_user_asset("stock_2_value")
-
     s3_qty = get_user_asset("total_stock_3")
     s3_val = get_user_asset("stock_3_value")
-
     s4_qty = get_user_asset("total_stock_4")
     s4_val = get_user_asset("stock_4_value")
+
+    if any(x is None for x in [
+            account_balance, s1_qty, s1_val, s2_qty, s2_val, s3_qty, s3_val,
+            s4_qty, s4_val
+    ]):
+        st.error("Error loading portfolio data")
+        st.stop()
 
     net_worth = account_balance + s1_val + s2_val + s3_val + s4_val
 
@@ -622,59 +668,54 @@ elif st.session_state.step == "compare_stocks":
 
     view_mode = st.selectbox("View mode: ", ["Histogram", "Box Plot"])
 
-    stock_files = {
-        "stock_1.json": {
-            "histogram_name": "Dave and Son's Coal Mine",
-            "boxplot_name": "Dave and Son's Coal"
-        },
-        "stock_2.json": {
-            "histogram_name": "Xavier's Egg Farm",
-            "boxplot_name": "Xavier's Egg"
-        },
-        "stock_3.json": {
-            "histogram_name": "Mr. Fox's Chicken Company",
-            "boxplot_name": "Mr. Fox's Chicken"
-        },
-        "stock_4.json": {
-            "histogram_name": "Raymond's Water Company",
-            "boxplot_name": "Raymond's Water"
-        }
-    }
+    names = [
+        "Dave and Son's Coal Mine", "Xavier's Egg Farm",
+        "Mr. Fox's Chicken Company", "Raymond's Water Company"
+    ]
 
-    all_data = {}
-    for file in stock_files.keys():
-        if os.path.exists(file):
-            with open(file, "r") as f:
-                all_data[file] = json.load(f)
+    p1 = get_user_asset("stock_1_values")
+    p2 = get_user_asset("stock_2_values")
+    p3 = get_user_asset("stock_3_values")
+    p4 = get_user_asset("stock_4_values")
+
+    if any(x is None for x in [p1, p2, p3, p4]):
+        st.error("Error loading stock data")
+        st.stop()
+
+    all_prices = [p1, p2, p3, p4]
 
     if view_mode == "Histogram":
-
         fig, ax = plt.subplots(figsize=(12, 6))
 
-        max_days = max(len(data["prices"]) for data in all_data.values())
-        step = max(1, max_days // 10)
-        days_to_show = list(range(0, max_days, step))
+        max_len = max(len(p) for p in all_prices)
+        step = max(1, max_len // 10)
+        indices = list(range(0, max_len, step))
+        if (max_len - 1) not in indices:
+            indices.append(max_len - 1)
 
-        if max_days not in days_to_show:
-            days_to_show.append(max_days)
-
-        x = np.arange(len(days_to_show))
+        x = np.arange(len(indices))
         width = 0.2
 
-        for i, (file, data) in enumerate(all_data.items()):
-            prices = data["prices"]
-            selected_prices = [
-                prices[min(d,
-                           len(prices) - 1)] for d in days_to_show
-            ]
-            ax.bar(x + i * width,
-                   selected_prices,
-                   width,
-                   label=stock_files[file]["histogram_name"])
+        ax.bar(x, [p1[min(i,
+                          len(p1) - 1)] for i in indices],
+               width,
+               label=names[0])
+        ax.bar(x + width, [p2[min(i,
+                                  len(p2) - 1)] for i in indices],
+               width,
+               label=names[1])
+        ax.bar(x + width * 2, [p3[min(i,
+                                      len(p3) - 1)] for i in indices],
+               width,
+               label=names[2])
+        ax.bar(x + width * 3, [p4[min(i,
+                                      len(p4) - 1)] for i in indices],
+               width,
+               label=names[3])
 
-        ax.set_xlabel("Time Period")
+        ax.set_xlabel("Time (Day)")
         ax.set_xticks(x + width * 1.5)
-        ax.set_xticklabels([f"Day {d}" for d in days_to_show])
+        ax.set_xticklabels([f"Day {i+1}" for i in indices])
         ax.set_ylabel("Price ($)")
         ax.legend()
         st.pyplot(fig)
@@ -684,14 +725,7 @@ elif st.session_state.step == "compare_stocks":
 
         with graph:
             fig, ax = plt.subplots(figsize=(10, 6))
-
-            prices_list = []
-            labels = []
-            for file, data in all_data.items():
-                prices_list.append(data["prices"])
-                labels.append(stock_files[file]["boxplot_name"])
-
-            ax.boxplot(prices_list, labels=labels)
+            ax.boxplot(all_prices, tick_labels=names)
             ax.set_ylabel("Stock Price ($)")
             plt.xticks(rotation=15)
             st.pyplot(fig)
@@ -699,25 +733,29 @@ elif st.session_state.step == "compare_stocks":
         with stats:
             st.subheader("Statistics")
 
+            def get_stats(p_list, name):
+                arr = np.array(p_list)
+                q1 = np.percentile(arr, 25)
+                q3 = np.percentile(arr, 75)
+                return [
+                    name, f"${np.median(arr):.2f}", f"${q1:.2f}", f"${q3:.2f}",
+                    f"${q3-q1:.2f}"
+                ]
+
+            rows = [
+                get_stats(p1, names[0]),
+                get_stats(p2, names[1]),
+                get_stats(p3, names[2]),
+                get_stats(p4, names[3])
+            ]
+
             stat_table = {
-                "Stock": [],
-                "Median": [],
-                "Q1": [],
-                "Q3": [],
-                "IQR": []
+                "Stock": [r[0] for r in rows],
+                "Median": [r[1] for r in rows],
+                "Q1": [r[2] for r in rows],
+                "Q3": [r[3] for r in rows],
+                "IQR": [r[4] for r in rows]
             }
-
-            for file, data in all_data.items():
-                prices = np.array(data["prices"])
-                q1 = np.percentile(prices, 25)
-                q3 = np.percentile(prices, 75)
-
-                stat_table["Stock"].append(stock_files[file]['boxplot_name'])
-                stat_table["Median"].append(f"${np.median(prices):.2f}")
-                stat_table["Q1"].append(f"${q1:.2f}")
-                stat_table["Q3"].append(f"${q3:.2f}")
-                stat_table["IQR"].append(f"${q3 - q1:.2f}")
-
             st.table(stat_table)
 
     st.divider()
