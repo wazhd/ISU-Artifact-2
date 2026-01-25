@@ -228,22 +228,22 @@ if "gemini_response" not in st.session_state:
     st.session_state.gemini_response = ""
 
 with st.sidebar:
-    if st.button("🏠 Home"):
+    if st.button("Home"):
         st.session_state.username = ""
         st.session_state.is_verified = False
         st.session_state.step = "menu"
         st.rerun()
     if st.session_state.is_verified:
-        if st.button("💰 Bank Account"):
+        if st.button("Bank Account"):
             st.session_state.step = "bank_account"
             st.rerun()
-        if st.button("📈 Stock Market"):
+        if st.button("Stock Market"):
             st.session_state.step = "stock_market"
             st.rerun()
-        if st.button("🏛️ Your assets"):
+        if st.button("Your assets"):
             st.session_state.step = "assets"
             st.rerun()
-        if st.button("📊 Compare Stocks"):
+        if st.button("Compare Stocks"):
             st.session_state.step = "compare_stocks"
             st.rerun()
 
