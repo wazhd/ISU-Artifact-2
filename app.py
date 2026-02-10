@@ -696,22 +696,10 @@ elif st.session_state.step == "compare_stocks":
         x = np.arange(len(indices))
         width = 0.2
 
-        ax.bar(x, [p1[min(i,
-                          len(p1) - 1)] for i in indices],
-               width,
-               label=names[0])
-        ax.bar(x + width, [p2[min(i,
-                                  len(p2) - 1)] for i in indices],
-               width,
-               label=names[1])
-        ax.bar(x + width * 2, [p3[min(i,
-                                      len(p3) - 1)] for i in indices],
-               width,
-               label=names[2])
-        ax.bar(x + width * 3, [p4[min(i,
-                                      len(p4) - 1)] for i in indices],
-               width,
-               label=names[3])
+        ax.bar(x, [p1[min(i, len(p1) - 1)] for i in indices], width, label=names[0])
+        ax.bar(x + width, [p2[min(i, len(p2) - 1)] for i in indices], width, label=names[1])
+        ax.bar(x + width * 2, [p3[min(i, len(p3) - 1)] for i in indices], width, label=names[2])
+        ax.bar(x + width * 3, [p4[min(i, len(p4) - 1)] for i in indices], width, label=names[3])
 
         ax.set_xlabel("Time (Day)")
         ax.set_xticks(x + width * 1.5)
